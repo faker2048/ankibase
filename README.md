@@ -13,7 +13,7 @@ Before using this module, you will need:
 
 ### Installation
 
-To install, simply download `note_database.py` and add it to your Python project.
+To install, simply download `note.py` and add it to your Python project.
 
 ### Usage
 
