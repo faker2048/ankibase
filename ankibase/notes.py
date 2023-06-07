@@ -1,6 +1,7 @@
 import sqlite3
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Generator
 
 
 @dataclass
@@ -32,50 +33,50 @@ class Note:
 
 class NoteDatabase:
     def __init__(self, db_path: str) -> None:
-        self.conn = sqlite3.connect(db_path)
-        self.cursor = self.conn.cursor()
+        self.db_path = db_path
+
+    @contextmanager
+    def connect(self):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            yield cursor
+        finally:
+            conn.commit()
+            conn.close()
 
     def insert_note(self, note: Note) -> None:
-        self.cursor.execute(
-            """
-            INSERT INTO notes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            note.to_row(),
-        )
-        self.conn.commit()
+        with self.connect() as cursor:
+            cursor.execute(
+                "INSERT INTO notes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                note.to_row(),
+            )
 
     def get_note(self, note_id: int) -> Optional[Note]:
-        self.cursor.execute(
-            """
-            SELECT * FROM notes WHERE id=?
-        """,
-            (note_id,),
-        )
-        row = self.cursor.fetchone()
-        if row is not None:
-            return Note.from_row(row)
-        return None
+        with self.connect() as cursor:
+            cursor.execute("SELECT * FROM notes WHERE id=?", (note_id,))
+            row = cursor.fetchone()
+            return Note.from_row(row) if row else None
+
+    def get_notes(self) -> Generator[Optional[Note], None, None]:
+        with self.connect() as cursor:
+            cursor.execute("SELECT * FROM notes")
+            rows = cursor.fetchall()
+            for row in rows:
+                yield Note.from_row(row)
 
     def update_note(self, note: Note) -> None:
-        self.cursor.execute(
-            """
-            UPDATE notes 
-            SET guid=?, mid=?, mod=?, usn=?, tags=?, flds=?, sfld=?, 
-                csum=?, flags=?, data=? 
-            WHERE id=?
-        """,
-            note.to_row() + (note.id,),
-        )
-        self.conn.commit()
+        with self.connect() as cursor:
+            cursor.execute(
+                """
+                UPDATE notes 
+                SET id=?, guid=?, mid=?, mod=?, usn=?, tags=?, flds=?, sfld=?, 
+                    csum=?, flags=?, data=? 
+                WHERE id=?
+            """,
+                note.to_row() + (note.id,),
+            )
 
     def delete_note(self, note_id: int) -> None:
-        self.cursor.execute(
-            """
-            DELETE FROM notes WHERE id=?
-        """,
-            (note_id,),
-        )
-        self.conn.commit()
-
-    def close(self) -> None:
-        self.conn.close()
+        with self.connect() as cursor:
+            cursor.execute("DELETE FROM notes WHERE id=?", (note_id,))
