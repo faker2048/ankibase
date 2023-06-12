@@ -9,7 +9,6 @@ This is a Python module for working with a SQLite database that stores notes. It
 Before using this module, you will need:
 
 - Python 3.6 or later
-- SQLite 3
 
 ### Installation
 
